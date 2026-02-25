@@ -13,10 +13,15 @@
         update: true
       register: git_clone
 
+    - name: Verify kubespray was cloned successfully
+      stat:
+        path: /tmp/kubespray/cluster.yml
+      register: kubespray_cluster_yml
+
     - name: Fail if kubespray was not cloned successfully
       fail:
-        msg: "kubespray clone failed or dest dir missing. Git output: {{ git_clone }}"
-      when: not (lookup('fileglob', '/tmp/kubespray/cluster.yml') | length > 0)
+        msg: "kubespray clone failed — /tmp/kubespray/cluster.yml not found. Git output: {{ git_clone }}"
+      when: not kubespray_cluster_yml.stat.exists
 
     - name: Install kubespray Python requirements
       pip:
