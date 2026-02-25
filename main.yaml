@@ -1,112 +1,197 @@
-- name: Run kubespray cluster.yml
-  hosts: localhost
-  connection: local
-  gather_facts: false
+---
+# ============================================================
+# Play 1 – Test connection
+# ============================================================
+- name: Test connection to hosts
+  hosts: all
+  gather_facts: true
 
   tasks:
-    - name: Clone kubespray repository
-      git:
-        repo: https://github.com/kubernetes-sigs/kubespray.git
-        dest: /tmp/kubespray
-        version: master
-        force: true
-        update: true
+    - name: Ping host
+      ping:
 
-    - name: Find kubespray cluster playbook candidates
-      find:
-        paths: /tmp/kubespray
-        patterns:
-          - cluster.yml
-          - cluster.yaml
-        file_type: file
-        recurse: true
-        follow: false
-      register: kubespray_cluster_candidates
+    - name: Show basic host info
+      debug:
+        msg: |
+          hostname : {{ ansible_hostname }}
+          OS       : {{ ansible_distribution }} {{ ansible_distribution_version }}
+          arch     : {{ ansible_architecture }}
+          IP       : {{ ansible_default_ipv4.address | default('n/a') }}
 
-    - name: Set kubespray cluster playbook path (prefer repo root, then playbooks/)
-      set_fact:
-        kubespray_cluster_playbook: >-
-          {{
-            (
-              kubespray_cluster_candidates.files
-              | map(attribute='path')
-              | select('match', '^/tmp/kubespray/cluster\\.ya?ml$')
-              | list
-              | first
-            )
-            or
-            (
-              kubespray_cluster_candidates.files
-              | map(attribute='path')
-              | select('match', '^/tmp/kubespray/playbooks/cluster\\.ya?ml$')
-              | list
-              | first
-            )
-            or
-            (
-              kubespray_cluster_candidates.files
-              | map(attribute='path')
-              | list
-              | first
-            )
-          }}
+    - name: Check uptime
+      command: uptime -p
+      register: uptime_result
+      changed_when: false
 
-    - name: Fail if kubespray cluster playbook not found
-      fail:
-        msg: >-
-          Unable to find kubespray cluster playbook. Searched under /tmp/kubespray for cluster.yml/cluster.yaml.
-          Found: {{ kubespray_cluster_candidates.files | map(attribute='path') | list }}
-      when: kubespray_cluster_playbook is not defined or kubespray_cluster_playbook | length == 0
+    - name: Show uptime
+      debug:
+        msg: "{{ uptime_result.stdout }}"
 
-    - name: Convert kubespray cluster playbook to path relative to repo root
-      set_fact:
-        kubespray_cluster_playbook_rel: "{{ kubespray_cluster_playbook | regex_replace('^/tmp/kubespray/', '') }}"
+# ============================================================
+# Play 2 – Install applications
+# ============================================================
+- name: Install applications
+  hosts: all
+  become: true
+  gather_facts: true
 
-    - name: Install kubespray Python requirements
-      pip:
-        requirements: /tmp/kubespray/requirements.txt
-        executable: pip3
-        extra_args: "--user --ignore-installed"
+  vars:
+    packages_to_install:
+      - htop
+      - curl
+      - wget
+      - git
+      - unzip
+      - vim
+      - net-tools
+      - jq
 
-    - name: Create kubespray inventory directory
+  tasks:
+    - name: Update apt cache (Debian/Ubuntu)
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Update yum cache (RedHat/CentOS)
+      yum:
+        update_cache: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Install packages (Debian/Ubuntu)
+      apt:
+        name: "{{ packages_to_install }}"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install packages (RedHat/CentOS)
+      yum:
+        name: "{{ packages_to_install }}"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Verify each package is installed
+      command: "dpkg -s {{ item }}"
+      register: verify_result
+      changed_when: false
+      failed_when: false
+      loop: "{{ packages_to_install }}"
+      when: ansible_os_family == "Debian"
+
+    - name: Show installation results
+      debug:
+        msg: "{{ item.item }}: {{ 'OK' if item.rc == 0 else 'MISSING' }}"
+      loop: "{{ verify_result.results }}"
+      when: ansible_os_family == "Debian"
+
+# ============================================================
+# Play 3 – Copy files
+# ============================================================
+- name: Copy files to hosts
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    remote_dir: /tmp/ansible-test
+
+  tasks:
+    - name: Create remote directory
       file:
-        path: /tmp/kubespray/inventory/mycluster/group_vars
+        path: "{{ remote_dir }}"
         state: directory
         mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
 
-    - name: Copy hosts.ini to kubespray inventory
+    - name: Copy a text file
       copy:
-        src: "{{ playbook_dir }}/hosts.ini"
-        dest: /tmp/kubespray/inventory/mycluster/hosts.ini
+        dest: "{{ remote_dir }}/hello.txt"
         mode: '0644'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        content: |
+          Hello from Ansible!
+          Host      : {{ ansible_hostname }}
+          Date      : {{ ansible_date_time.iso8601 }}
+          Playbook  : {{ playbook_dir }}
 
-    - name: Find group_vars files
+    - name: Copy an executable script
+      copy:
+        dest: "{{ remote_dir }}/info.sh"
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        content: |
+          #!/bin/bash
+          echo "=== System info ==="
+          uname -a
+          echo "=== Disk ==="
+          df -h /
+          echo "=== Memory ==="
+          free -h
+
+    - name: Fetch a file back from remote host
+      fetch:
+        src: "{{ remote_dir }}/hello.txt"
+        dest: "/tmp/fetched/{{ inventory_hostname }}/hello.txt"
+        flat: true
+
+    - name: Show copied files
       find:
-        paths: "{{ playbook_dir }}/group_vars"
-        recurse: true
-      register: group_vars_files
+        paths: "{{ remote_dir }}"
+      register: copied_files
 
-    - name: Copy group_vars to kubespray inventory
-      copy:
-        src: "{{ item.path }}"
-        dest: "/tmp/kubespray/inventory/mycluster/group_vars/{{ item.path | relpath(playbook_dir + '/group_vars') }}"
-        mode: '0644'
-      loop: "{{ group_vars_files.files }}"
-      when: group_vars_files.files | length > 0
-
-    - name: Run kubespray cluster playbook
-      command: >
-        ansible-playbook
-        -i /tmp/kubespray/inventory/mycluster/hosts.ini
-        --private-key /tmp/ansible-key
-        --become
-        {{ kubespray_cluster_playbook_rel }}
-      args:
-        chdir: /tmp/kubespray
-      environment:
-        PATH: "/home/nonroot/.local/bin:{{ ansible_env.PATH }}"
-      register: kubespray_result
-
-    - name: Show kubespray output
+    - name: List files on remote
       debug:
-        var: kubespray_result.stdout_lines
+        msg: "{{ copied_files.files | map(attribute='path') | list }}"
+
+# ============================================================
+# Play 4 – Uninstall applications
+# ============================================================
+- name: Uninstall applications
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    packages_to_remove:
+      - htop
+      - vim
+      - net-tools
+
+  tasks:
+    - name: Remove packages (Debian/Ubuntu)
+      apt:
+        name: "{{ packages_to_remove }}"
+        state: absent
+        purge: true
+        autoremove: true
+      when: ansible_os_family == "Debian"
+
+    - name: Remove packages (RedHat/CentOS)
+      yum:
+        name: "{{ packages_to_remove }}"
+        state: absent
+        autoremove: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Clean up remote test directory
+      file:
+        path: /tmp/ansible-test
+        state: absent
+
+    - name: Confirm packages are removed (Debian/Ubuntu)
+      command: "dpkg -s {{ item }}"
+      register: uninstall_check
+      changed_when: false
+      failed_when: false
+      loop: "{{ packages_to_remove }}"
+      when: ansible_os_family == "Debian"
+
+    - name: Show uninstall results
+      debug:
+        msg: "{{ item.item }}: {{ 'STILL INSTALLED' if item.rc == 0 else 'removed OK' }}"
+      loop: "{{ uninstall_check.results }}"
+      when: ansible_os_family == "Debian"
+
