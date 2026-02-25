@@ -1,0 +1,44 @@
+- name: Run kubespray cluster.yml
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Clone kubespray repository
+      git:
+        repo: https://github.com/kubernetes-sigs/kubespray.git
+        dest: /tmp/kubespray
+        version: master
+        force: true
+
+    - name: Install kubespray Python requirements
+      pip:
+        requirements: /tmp/kubespray/requirements.txt
+        executable: pip3
+
+    - name: Copy inventory to kubespray
+      copy:
+        src: "{{ playbook_dir }}/hosts.ini"
+        dest: /tmp/kubespray/inventory/mycluster/hosts.ini
+        mode: '0644'
+
+    - name: Copy group_vars to kubespray inventory
+      copy:
+        src: "{{ playbook_dir }}/group_vars/"
+        dest: /tmp/kubespray/inventory/mycluster/group_vars/
+        mode: '0644'
+      when: "{{ lookup('fileglob', playbook_dir + '/group_vars/*') | length > 0 }}"
+
+    - name: Run kubespray cluster playbook
+      command: >
+        ansible-playbook
+        -i /tmp/kubespray/inventory/mycluster/hosts.ini
+        --private-key /tmp/ansible-key
+        --become
+        /tmp/kubespray/cluster.yml
+      register: kubespray_result
+
+    - name: Show kubespray output
+      debug:
+        var: kubespray_result.stdout_lines
+
