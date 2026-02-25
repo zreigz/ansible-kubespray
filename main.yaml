@@ -137,14 +137,21 @@
         dest: "/tmp/fetched/{{ inventory_hostname }}/hello.txt"
         flat: true
 
+    - name: Check remote directory exists
+      stat:
+        path: "{{ remote_dir }}"
+      register: remote_dir_stat
+
     - name: Show copied files
       find:
         paths: "{{ remote_dir }}"
       register: copied_files
+      when: remote_dir_stat.stat.exists and remote_dir_stat.stat.isdir
 
     - name: List files on remote
       debug:
         msg: "{{ copied_files.files | map(attribute='path') | list }}"
+      when: remote_dir_stat.stat.exists and remote_dir_stat.stat.isdir
 
 # ============================================================
 # Play 4 – Uninstall applications
