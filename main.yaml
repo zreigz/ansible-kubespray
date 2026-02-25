@@ -11,17 +11,6 @@
         version: master
         force: true
         update: true
-      register: git_clone
-
-    - name: Verify kubespray was cloned successfully
-      stat:
-        path: /tmp/kubespray/cluster.yml
-      register: kubespray_cluster_yml
-
-    - name: Fail if kubespray was not cloned successfully
-      fail:
-        msg: "kubespray clone failed — /tmp/kubespray/cluster.yml not found. Git output: {{ git_clone }}"
-      when: not kubespray_cluster_yml.stat.exists
 
     - name: Install kubespray Python requirements
       pip:
@@ -35,18 +24,25 @@
         state: directory
         mode: '0755'
 
-    - name: Copy inventory to kubespray
+    - name: Copy hosts.ini to kubespray inventory
       copy:
         src: "{{ playbook_dir }}/hosts.ini"
         dest: /tmp/kubespray/inventory/mycluster/hosts.ini
         mode: '0644'
 
+    - name: Find group_vars files
+      find:
+        paths: "{{ playbook_dir }}/group_vars"
+        recurse: true
+      register: group_vars_files
+
     - name: Copy group_vars to kubespray inventory
       copy:
-        src: "{{ playbook_dir }}/group_vars/"
-        dest: /tmp/kubespray/inventory/mycluster/group_vars/
+        src: "{{ item.path }}"
+        dest: "/tmp/kubespray/inventory/mycluster/group_vars/{{ item.path | relpath(playbook_dir + '/group_vars') }}"
         mode: '0644'
-      when: lookup('fileglob', playbook_dir + '/group_vars/*') | length > 0
+      loop: "{{ group_vars_files.files }}"
+      when: group_vars_files.files | length > 0
 
     - name: Run kubespray cluster playbook
       command: >
@@ -57,6 +53,8 @@
         cluster.yml
       args:
         chdir: /tmp/kubespray
+      environment:
+        PATH: "/home/nonroot/.local/bin:{{ ansible_env.PATH }}"
       register: kubespray_result
 
     - name: Show kubespray output
