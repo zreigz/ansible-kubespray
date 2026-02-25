@@ -12,6 +12,56 @@
         force: true
         update: true
 
+    - name: Find kubespray cluster playbook candidates
+      find:
+        paths: /tmp/kubespray
+        patterns:
+          - cluster.yml
+          - cluster.yaml
+        file_type: file
+        recurse: true
+        follow: false
+      register: kubespray_cluster_candidates
+
+    - name: Set kubespray cluster playbook path (prefer repo root, then playbooks/)
+      set_fact:
+        kubespray_cluster_playbook: >-
+          {{
+            (
+              kubespray_cluster_candidates.files
+              | map(attribute='path')
+              | select('match', '^/tmp/kubespray/cluster\\.ya?ml$')
+              | list
+              | first
+            )
+            or
+            (
+              kubespray_cluster_candidates.files
+              | map(attribute='path')
+              | select('match', '^/tmp/kubespray/playbooks/cluster\\.ya?ml$')
+              | list
+              | first
+            )
+            or
+            (
+              kubespray_cluster_candidates.files
+              | map(attribute='path')
+              | list
+              | first
+            )
+          }}
+
+    - name: Fail if kubespray cluster playbook not found
+      fail:
+        msg: >-
+          Unable to find kubespray cluster playbook. Searched under /tmp/kubespray for cluster.yml/cluster.yaml.
+          Found: {{ kubespray_cluster_candidates.files | map(attribute='path') | list }}
+      when: kubespray_cluster_playbook is not defined or kubespray_cluster_playbook | length == 0
+
+    - name: Convert kubespray cluster playbook to path relative to repo root
+      set_fact:
+        kubespray_cluster_playbook_rel: "{{ kubespray_cluster_playbook | regex_replace('^/tmp/kubespray/', '') }}"
+
     - name: Install kubespray Python requirements
       pip:
         requirements: /tmp/kubespray/requirements.txt
@@ -50,7 +100,7 @@
         -i /tmp/kubespray/inventory/mycluster/hosts.ini
         --private-key /tmp/ansible-key
         --become
-        cluster.yml
+        {{ kubespray_cluster_playbook_rel }}
       args:
         chdir: /tmp/kubespray
       environment:
