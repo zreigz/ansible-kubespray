@@ -11,6 +11,12 @@
         version: master
         force: true
         update: true
+      register: git_clone
+
+    - name: Fail if kubespray was not cloned successfully
+      fail:
+        msg: "kubespray clone failed or dest dir missing. Git output: {{ git_clone }}"
+      when: not (lookup('fileglob', '/tmp/kubespray/cluster.yml') | length > 0)
 
     - name: Install kubespray Python requirements
       pip:
