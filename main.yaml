@@ -42,7 +42,9 @@
         -i /tmp/kubespray/inventory/mycluster/hosts.ini
         --private-key /tmp/ansible-key
         --become
-        /tmp/kubespray/cluster.yml
+        cluster.yml
+      args:
+        chdir: /tmp/kubespray
       register: kubespray_result
 
     - name: Show kubespray output
