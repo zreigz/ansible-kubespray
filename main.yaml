@@ -17,6 +17,12 @@
         executable: pip3
         extra_args: "--user --ignore-installed"
 
+    - name: Create kubespray inventory directory
+      file:
+        path: /tmp/kubespray/inventory/mycluster/group_vars
+        state: directory
+        mode: '0755'
+
     - name: Copy inventory to kubespray
       copy:
         src: "{{ playbook_dir }}/hosts.ini"
