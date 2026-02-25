@@ -4,12 +4,24 @@
   gather_facts: false
 
   tasks:
+    - name: Ensure kubespray destination directory exists
+      file:
+        path: /tmp/kubespray
+        state: directory
+        mode: '0755'
+
     - name: Clone kubespray repository
       git:
         repo: https://github.com/kubernetes-sigs/kubespray.git
         dest: /tmp/kubespray
         version: master
         force: true
+      register: clone_result
+
+    - name: Fail if kubespray repository could not be cloned
+      fail:
+        msg: "Could not clone kubespray repository: {{ clone_result.stderr }}"
+      when: clone_result.failed
 
     - name: Install kubespray Python requirements
       pip:
@@ -50,4 +62,3 @@
     - name: Show kubespray output
       debug:
         var: kubespray_result.stdout_lines
-
