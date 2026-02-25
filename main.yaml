@@ -15,6 +15,7 @@
       pip:
         requirements: /tmp/kubespray/requirements.txt
         executable: pip3
+        extra_args: "--user --ignore-installed"
 
     - name: Copy inventory to kubespray
       copy:
