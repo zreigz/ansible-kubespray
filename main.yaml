@@ -27,7 +27,7 @@
         src: "{{ playbook_dir }}/group_vars/"
         dest: /tmp/kubespray/inventory/mycluster/group_vars/
         mode: '0644'
-      when: "{{ lookup('fileglob', playbook_dir + '/group_vars/*') | length > 0 }}"
+      when: lookup('fileglob', playbook_dir + '/group_vars/*') | length > 0
 
     - name: Run kubespray cluster playbook
       command: >
