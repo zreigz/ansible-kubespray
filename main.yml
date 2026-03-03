@@ -1,0 +1,55 @@
+---
+- name: Prepare Kubespray environment
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    kubespray_path: "/plural/kubespray"
+    kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
+    kubespray_version: release-2.30
+    inventory_path: "{{ kubespray_path }}/inventory/single"
+    ssh_private_key: "{{ ansible_ssh_private_key_file | default('/tmp/ssh-privatekey') }}"
+
+  tasks:
+    - name: Remove existing kubespray directory
+      file:
+        path: "{{ kubespray_path }}"
+        state: absent
+      check_mode: no
+
+    - name: Clone Kubespray
+      git:
+        repo: "{{ kubespray_repo }}"
+        dest: "{{ kubespray_path }}"
+        version: "{{ kubespray_version }}"
+        depth: 1
+      check_mode: no
+
+    - name: Create Python virtual environment and install requirements
+      shell: |
+        python3 -m venv {{ kubespray_path }}/venv
+        {{ kubespray_path }}/venv/bin/pip install --upgrade pip
+        {{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt
+      args:
+        creates: "{{ kubespray_path }}/venv/bin/ansible-playbook"
+
+    - name: Create inventory directory
+      file:
+        path: "{{ inventory_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy group_vars from sample
+      copy:
+        src: "{{ kubespray_path }}/inventory/sample/group_vars"
+        dest: "{{ inventory_path }}/"
+        remote_src: yes
+
+    - name: Copy inventory file
+      copy:
+        src: "{{ playbook_dir }}/inventory.yaml"
+        dest: "{{ inventory_path }}/inventory.yaml"
+        remote_src: yes
+
+- name: Install Kubernetes
+  ansible.builtin.import_playbook: kubespray/cluster.yml
