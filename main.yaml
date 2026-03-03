@@ -4,45 +4,20 @@
   gather_facts: yes
 
   vars:
-    kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
-    kubespray_version: release-2.30
-    kubespray_path: /plural/kubespray
+    kubespray_path: kubespray
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
     ssh_private_key: "{{ ansible_ssh_private_key_file | default('/tmp/ssh-privatekey') }}"
 
   tasks:
-    - name: Install dependencies (Debian/Ubuntu control node)
-      become: yes
-      become_method: sudo
-      apt:
-        name:
-          - git
-          - python3
-          - python3-pip
-          - python3-venv
-          - sshpass
-          - rsync
-        state: present
-        update_cache: yes
-      when: ansible_os_family == "Debian"
-
-    - name: Remove existing kubespray directory if present
-      file:
-        path: "{{ kubespray_path }}"
-        state: absent
-      check_mode: no
-
-    - name: Clone Kubespray
-      shell: "git clone --depth=1 --branch {{ kubespray_version }} {{ kubespray_repo }} {{ kubespray_path }}"
-      check_mode: no
-
     - name: Create Python virtual environment and install requirements
       shell: |
         python3 -m venv {{ kubespray_path }}/venv
         {{ kubespray_path }}/venv/bin/pip install --upgrade pip
         {{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt
         {{ kubespray_path }}/venv/bin/pip install ansible
+      args:
+        creates: "{{ kubespray_path }}/venv/bin/ansible-playbook"
       check_mode: no
 
     - name: Create inventory directory
@@ -89,6 +64,9 @@
         -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
         --become
         --private-key {{ ssh_private_key }}
+        -e ignore_assert_errors=yes
+        -e minimal_master_memory_mb=0
+        -e minimal_node_memory_mb=0
         {{ kubespray_path }}/cluster.yml
       args:
         chdir: "{{ kubespray_path }}"
