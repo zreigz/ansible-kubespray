@@ -5,7 +5,7 @@
 
   vars:
     kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
-    kubespray_version: release-2.30.0
+    kubespray_version: v2.30.0
     kubespray_path: /plural/kubespray
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
