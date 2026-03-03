@@ -30,9 +30,11 @@
       file:
         path: "{{ kubespray_path }}"
         state: absent
+      check_mode: no
 
     - name: Clone Kubespray
       shell: "git clone --depth=1 --branch {{ kubespray_version }} {{ kubespray_repo }} {{ kubespray_path }}"
+      check_mode: no
 
     - name: Stat kubespray directory after clone
       stat:
@@ -46,6 +48,7 @@
     - name: List kubespray directory contents
       shell: "ls -la {{ kubespray_path }}"
       register: kubespray_dir_contents
+      check_mode: no
 
     - name: Debug kubespray directory contents
       debug:
@@ -53,15 +56,19 @@
 
     - name: Create Python virtual environment
       shell: "python3 -m venv {{ kubespray_path }}/venv"
+      check_mode: no
 
     - name: Upgrade pip in virtual environment
       shell: "{{ kubespray_path }}/venv/bin/pip install --upgrade pip"
+      check_mode: no
 
     - name: Install Python requirements
       shell: "{{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt"
+      check_mode: no
 
     - name: Ensure ansible is installed in virtual environment
       shell: "{{ kubespray_path }}/venv/bin/pip install ansible"
+      check_mode: no
 
     - name: Verify ansible-playbook binary exists
       stat:
@@ -78,6 +85,7 @@
         path: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
         state: directory
         mode: '0755'
+      check_mode: no
 
     - name: Generate single-node inventory
       copy:
@@ -105,14 +113,25 @@
                   kube_node:
               calico_rr:
                 hosts: {}
+      check_mode: no
 
     - name: Find cluster playbook
       shell: "find {{ kubespray_path }} -maxdepth 2 -name 'cluster.yml' | head -1"
       register: cluster_playbook
+      check_mode: no
 
     - name: Debug cluster playbook path
       debug:
         msg: "cluster.yml found at: {{ cluster_playbook.stdout }}"
+
+    - name: Deploy Kubernetes (single node) [CHECK MODE - would run this command]
+      debug:
+        msg: >
+          Would run: {{ kubespray_path }}/venv/bin/ansible-playbook
+          -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
+          --become --become-user=root
+          {{ cluster_playbook.stdout }}
+      when: cluster_playbook.stdout != "" and ansible_check_mode
 
     - name: Deploy Kubernetes (single node)
       shell: >
@@ -120,5 +139,6 @@
         -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
         --become --become-user=root
         {{ cluster_playbook.stdout }}
-      when: cluster_playbook.stdout != ""
+      check_mode: no
+      when: cluster_playbook.stdout != "" and not ansible_check_mode
 
