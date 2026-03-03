@@ -4,7 +4,7 @@
   gather_facts: no
 
   vars:
-    kubespray_path: "/plural/kubespray"
+    kubespray_path: "{{ playbook_dir }}/kubespray"
     kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
     kubespray_version: release-2.30
     inventory_path: "{{ kubespray_path }}/inventory/single"
