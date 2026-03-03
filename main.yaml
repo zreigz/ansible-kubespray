@@ -61,23 +61,52 @@
       args:
         creates: "{{ kubespray_path }}/venv/lib"
 
-    - name: Create inventory folder
-      shell: "cp -rfp {{ kubespray_path }}/inventory/sample {{ kubespray_path }}/inventory/{{ inventory_name }}"
-      args:
-        creates: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
+    - name: Create inventory directory
+      file:
+        path: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
+        state: directory
+        mode: '0755'
 
     - name: Generate single-node inventory
-      shell: >
-        {{ kubespray_path }}/venv/bin/python3
-        {{ kubespray_path }}/contrib/inventory_builder/inventory.py
-        {{ node_ip }}
-      environment:
-        CONFIG_FILE: "{{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml"
+      copy:
+        dest: "{{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml"
+        content: |
+          all:
+            hosts:
+              node1:
+                ansible_host: {{ node_ip }}
+                ip: {{ node_ip }}
+                access_ip: {{ node_ip }}
+            children:
+              kube_control_plane:
+                hosts:
+                  node1:
+              kube_node:
+                hosts:
+                  node1:
+              etcd:
+                hosts:
+                  node1:
+              k8s_cluster:
+                children:
+                  kube_control_plane:
+                  kube_node:
+              calico_rr:
+                hosts: {}
+
+    - name: Find cluster playbook
+      shell: "find {{ kubespray_path }} -maxdepth 2 -name 'cluster.yml' | head -1"
+      register: cluster_playbook
+
+    - name: Debug cluster playbook path
+      debug:
+        msg: "cluster.yml found at: {{ cluster_playbook.stdout }}"
 
     - name: Deploy Kubernetes (single node)
       shell: >
         {{ kubespray_path }}/venv/bin/ansible-playbook
         -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
         --become --become-user=root
-        {{ kubespray_path }}/cluster.yml
+        {{ cluster_playbook.stdout }}
+      when: cluster_playbook.stdout != ""
 
