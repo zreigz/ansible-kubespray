@@ -1,277 +1,73 @@
 ---
-# ============================================================
-# Play 1 – Test connection
-# ============================================================
-- name: Test connection to hosts
-  hosts: all
-  gather_facts: true
-
-  tasks:
-    - name: Ping host
-      ping:
-
-    - name: Show basic host info
-      debug:
-        msg: |
-          hostname : {{ ansible_hostname }}
-          OS       : {{ ansible_distribution }} {{ ansible_distribution_version }}
-          arch     : {{ ansible_architecture }}
-          IP       : {{ ansible_default_ipv4.address | default('n/a') }}
-
-    - name: Check uptime
-      command: uptime -p
-      register: uptime_result
-      changed_when: false
-
-    - name: Show uptime
-      debug:
-        msg: "{{ uptime_result.stdout }}"
-
-# ============================================================
-# Play 2 – Install applications
-# ============================================================
-- name: Install applications
-  hosts: all
-  become: true
-  gather_facts: true
+- name: Deploy Single Node Kubernetes via Kubespray
+  hosts: localhost
+  gather_facts: yes
 
   vars:
-    packages_to_install:
-      - htop
-      - curl
-      - wget
-      - git
-      - unzip
-      - vim
-      - net-tools
-      - jq
+    kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
+    kubespray_version: release-2.30.0
+    kubespray_path: /opt/kubespray
+    inventory_name: single
+    node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
 
   tasks:
-    - name: Update apt cache (Debian/Ubuntu)
+
+    - name: Install dependencies (Ubuntu/Debian)
+      become: yes
       apt:
-        update_cache: true
-        cache_valid_time: 3600
-      when: ansible_os_family == "Debian"
-
-    - name: Update yum cache (RedHat/CentOS)
-      yum:
-        update_cache: true
-      when: ansible_os_family == "RedHat"
-
-    - name: Install packages (Debian/Ubuntu)
-      apt:
-        name: "{{ packages_to_install }}"
+        name:
+          - git
+          - python3-pip
+          - python3-venv
         state: present
+        update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Install packages (RedHat/CentOS)
-      yum:
-        name: "{{ packages_to_install }}"
-        state: present
-      when: ansible_os_family == "RedHat"
-
-    - name: Verify each package is installed
-      command: "dpkg -s {{ item }}"
-      register: verify_result
-      changed_when: false
-      failed_when: false
-      loop: "{{ packages_to_install }}"
-      when: ansible_os_family == "Debian"
-
-    - name: Show installation results
-      debug:
-        msg: "{{ item.item }}: {{ 'OK' if item.rc == 0 else 'MISSING' }}"
-      loop: "{{ verify_result.results }}"
-      when: ansible_os_family == "Debian"
-
-# ============================================================
-# Play 3 – Copy files
-# ============================================================
-- name: Copy files to hosts
-  hosts: all
-  become: true
-  gather_facts: true
-
-  vars:
-    remote_dir: /tmp/ansible-test
-
-  tasks:
-    - name: Create remote directory
-      file:
-        path: "{{ remote_dir }}"
-        state: directory
-        mode: '0755'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-
-    - name: Copy a text file
-      copy:
-        dest: "{{ remote_dir }}/hello.txt"
-        mode: '0644'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        content: |
-          Hello from Ansible!
-          Host      : {{ ansible_hostname }}
-          Date      : {{ ansible_date_time.iso8601 }}
-          Playbook  : {{ playbook_dir }}
-
-    - name: Copy an executable script
-      copy:
-        dest: "{{ remote_dir }}/info.sh"
-        mode: '0755'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        content: |
-          #!/bin/bash
-          echo "=== System info ==="
-          uname -a
-          echo "=== Disk ==="
-          df -h /
-          echo "=== Memory ==="
-          free -h
-
-    - name: Fetch a file back from remote host
-      fetch:
-        src: "{{ remote_dir }}/hello.txt"
-        dest: "/tmp/fetched/{{ inventory_hostname }}/hello.txt"
-        flat: true
-
-    - name: Check remote directory exists
-      stat:
-        path: "{{ remote_dir }}"
-      register: remote_dir_stat
-
-    - name: Show copied files
-      find:
-        paths: "{{ remote_dir }}"
-      register: copied_files
-      when: remote_dir_stat.stat.exists and remote_dir_stat.stat.isdir
-
-    - name: List files on remote
-      debug:
-        msg: "{{ copied_files.files | map(attribute='path') | list }}"
-      when: remote_dir_stat.stat.exists and remote_dir_stat.stat.isdir
-
-# ============================================================
-# Play 3b – Clone a small application
-# ============================================================
-- name: Clone and inspect a small application
-  hosts: all
-  become: true
-  gather_facts: true
-
-  vars:
-    app_repo_url: "https://github.com/nginxinc/NGINX-Demos.git"
-    app_dest: "/tmp/nginx-demos"
-    app_version: "master"
-
-  tasks:
-    - name: Ensure git is installed
-      apt:
-        name: git
-        state: present
-        update_cache: true
-      when: ansible_os_family == "Debian"
-
-    - name: Ensure git is installed (RedHat/CentOS)
-      yum:
-        name: git
-        state: present
-      when: ansible_os_family == "RedHat"
-
-    - name: Clone application repository
+    - name: Clone Kubespray
+      become: yes
       git:
-        repo: "{{ app_repo_url }}"
-        dest: "{{ app_dest }}"
-        version: "{{ app_version }}"
-        depth: 1
-        force: true
+        repo: "{{ kubespray_repo }}"
+        dest: "{{ kubespray_path }}"
+        version: "{{ kubespray_version }}"
+        force: yes
 
-    - name: Stat cloned directory
-      stat:
-        path: "{{ app_dest }}"
-      register: app_dir_stat
+    - name: Create Python virtual environment
+      become: yes
+      command: python3 -m venv venv
+      args:
+        chdir: "{{ kubespray_path }}"
+        creates: "{{ kubespray_path }}/venv"
 
-    - name: List top-level files in cloned repo
-      find:
-        paths: "{{ app_dest }}"
-        file_type: any
-        depth: 1
-      register: app_files
-      when: app_dir_stat.stat.exists
+    - name: Install Python requirements
+      become: yes
+      pip:
+        requirements: "{{ kubespray_path }}/requirements.txt"
+        virtualenv: "{{ kubespray_path }}/venv"
 
-    - name: Show cloned repo contents
-      debug:
-        msg: "{{ app_files.files | map(attribute='path') | map('basename') | sort | list }}"
-      when: app_dir_stat.stat.exists
+    - name: Create inventory folder
+      become: yes
+      command: cp -rfp inventory/sample inventory/{{ inventory_name }}
+      args:
+        chdir: "{{ kubespray_path }}"
+        creates: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
 
-    - name: Show README if present
-      command: "cat {{ app_dest }}/README.md"
-      register: readme_content
-      changed_when: false
-      failed_when: false
-      when: app_dir_stat.stat.exists
+    - name: Generate single-node inventory
+      become: yes
+      command: >
+        {{ kubespray_path }}/venv/bin/python3
+        contrib/inventory_builder/inventory.py
+        {{ node_ip }}
+      args:
+        chdir: "{{ kubespray_path }}"
+      environment:
+        CONFIG_FILE: "{{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml"
 
-    - name: Print README
-      debug:
-        msg: "{{ readme_content.stdout_lines[:20] }}"
-      when:
-        - app_dir_stat.stat.exists
-        - readme_content.rc is defined
-        - readme_content.rc == 0
-
-    - name: Clean up cloned repository
-      file:
-        path: "{{ app_dest }}"
-        state: absent
-
-# ============================================================
-# Play 4 – Uninstall applications
-# ============================================================
-- name: Uninstall applications
-  hosts: all
-  become: true
-  gather_facts: true
-
-  vars:
-    packages_to_remove:
-      - htop
-      - vim
-      - net-tools
-
-  tasks:
-    - name: Remove packages (Debian/Ubuntu)
-      apt:
-        name: "{{ packages_to_remove }}"
-        state: absent
-        purge: true
-        autoremove: true
-      when: ansible_os_family == "Debian"
-
-    - name: Remove packages (RedHat/CentOS)
-      yum:
-        name: "{{ packages_to_remove }}"
-        state: absent
-        autoremove: true
-      when: ansible_os_family == "RedHat"
-
-    - name: Clean up remote test directory
-      file:
-        path: /tmp/ansible-test
-        state: absent
-
-    - name: Confirm packages are removed (Debian/Ubuntu)
-      command: "dpkg -s {{ item }}"
-      register: uninstall_check
-      changed_when: false
-      failed_when: false
-      loop: "{{ packages_to_remove }}"
-      when: ansible_os_family == "Debian"
-
-    - name: Show uninstall results
-      debug:
-        msg: "{{ item.item }}: {{ 'STILL INSTALLED' if item.rc == 0 else 'removed OK' }}"
-      loop: "{{ uninstall_check.results }}"
-      when: ansible_os_family == "Debian"
-
+    - name: Deploy Kubernetes (single node)
+      become: yes
+      command: >
+        {{ kubespray_path }}/venv/bin/ansible-playbook
+        -i inventory/{{ inventory_name }}/hosts.yaml
+        --become --become-user=root
+        cluster.yml
+      args:
+        chdir: "{{ kubespray_path }}"
