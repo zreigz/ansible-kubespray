@@ -5,7 +5,7 @@
 
   vars:
     kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
-    kubespray_version: v2.30.0
+    kubespray_version: release-2.30.0
     kubespray_path: /plural/kubespray
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
@@ -33,8 +33,17 @@
         version: "{{ kubespray_version }}"
         force: yes
 
-    - name: Verify kubespray directory exists and list contents
-      command: ls -la {{ kubespray_path }}
+    - name: Stat kubespray directory after clone
+      stat:
+        path: "{{ kubespray_path }}"
+      register: kubespray_stat
+
+    - name: Debug kubespray stat result
+      debug:
+        msg: "exists={{ kubespray_stat.stat.exists }} isdir={{ kubespray_stat.stat.isdir }} owner={{ kubespray_stat.stat.pw_name }}"
+
+    - name: List kubespray directory contents
+      shell: "ls -la {{ kubespray_path }}"
       register: kubespray_dir_contents
 
     - name: Debug kubespray directory contents
@@ -42,37 +51,32 @@
         msg: "{{ kubespray_dir_contents.stdout_lines }}"
 
     - name: Create Python virtual environment
-      command: python3 -m venv venv
+      shell: "python3 -m venv {{ kubespray_path }}/venv"
       args:
-        chdir: "{{ kubespray_path }}"
-        creates: "{{ kubespray_path }}/venv"
+        creates: "{{ kubespray_path }}/venv/bin/python3"
 
     - name: Install Python requirements
-      pip:
-        requirements: "{{ kubespray_path }}/requirements.txt"
-        virtualenv: "{{ kubespray_path }}/venv"
+      shell: "{{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt"
+      args:
+        creates: "{{ kubespray_path }}/venv/lib"
 
     - name: Create inventory folder
-      command: cp -rfp inventory/sample inventory/{{ inventory_name }}
+      shell: "cp -rfp {{ kubespray_path }}/inventory/sample {{ kubespray_path }}/inventory/{{ inventory_name }}"
       args:
-        chdir: "{{ kubespray_path }}"
         creates: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
 
     - name: Generate single-node inventory
-      command: >
+      shell: >
         {{ kubespray_path }}/venv/bin/python3
-        contrib/inventory_builder/inventory.py
+        {{ kubespray_path }}/contrib/inventory_builder/inventory.py
         {{ node_ip }}
-      args:
-        chdir: "{{ kubespray_path }}"
       environment:
         CONFIG_FILE: "{{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml"
 
     - name: Deploy Kubernetes (single node)
-      command: >
+      shell: >
         {{ kubespray_path }}/venv/bin/ansible-playbook
-        -i inventory/{{ inventory_name }}/hosts.yaml
+        -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
         --become --become-user=root
-        cluster.yml
-      args:
-        chdir: "{{ kubespray_path }}"
+        {{ kubespray_path }}/cluster.yml
+
