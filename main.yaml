@@ -39,6 +39,14 @@
         version: "{{ kubespray_version }}"
         force: yes
 
+    - name: Verify kubespray directory exists and list contents
+      command: ls -la {{ kubespray_path }}
+      register: kubespray_dir_contents
+
+    - name: Debug kubespray directory contents
+      debug:
+        msg: "{{ kubespray_dir_contents.stdout_lines }}"
+
     - name: Create Python virtual environment
       command: python3 -m venv venv
       args:
