@@ -6,7 +6,7 @@
   vars:
     kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
     kubespray_version: release-2.30.0
-    kubespray_path: /opt/kubespray
+    kubespray_path: /home/nonroot/kubespray
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
 
@@ -22,6 +22,12 @@
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
+
+    - name: Ensure kubespray parent directory exists
+      file:
+        path: "{{ kubespray_path | dirname }}"
+        state: directory
+        mode: '0755'
 
     - name: Clone Kubespray
       become: yes
