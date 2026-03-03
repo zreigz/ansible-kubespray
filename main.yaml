@@ -37,55 +37,12 @@
       shell: "git clone --depth=1 --branch {{ kubespray_version }} {{ kubespray_repo }} {{ kubespray_path }}"
       check_mode: no
 
-    - name: Stat kubespray directory after clone
-      stat:
-        path: "{{ kubespray_path }}"
-      register: kubespray_stat
-
-    - name: Debug kubespray stat result
-      debug:
-        msg: "exists={{ kubespray_stat.stat.exists }} isdir={{ kubespray_stat.stat.get('isdir', 'N/A') }} owner={{ kubespray_stat.stat.get('pw_name', 'N/A') }}"
-
-    - name: List kubespray directory contents
-      shell: "ls -la {{ kubespray_path }}"
-      register: kubespray_dir_contents
-      check_mode: no
-
-    - name: Debug kubespray directory contents
-      debug:
-        msg: "{{ kubespray_dir_contents.stdout_lines }}"
-
-    - name: Create Python virtual environment
-      shell: "python3 -m venv {{ kubespray_path }}/venv"
-      check_mode: no
-
-    - name: Upgrade pip in virtual environment
-      shell: "{{ kubespray_path }}/venv/bin/pip install --upgrade pip"
-      check_mode: no
-
-    - name: Install Python requirements
-      shell: "{{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt"
-      check_mode: no
-
-    - name: Ensure ansible is installed in virtual environment
-      shell: "{{ kubespray_path }}/venv/bin/pip install ansible"
-      check_mode: no
-
-    - name: Verify ansible-playbook binary exists
-      stat:
-        path: "{{ kubespray_path }}/venv/bin/ansible-playbook"
-      register: ansible_bin
-
-    - name: Fail if ansible-playbook not found in venv
-      fail:
-        msg: "ansible-playbook not found at {{ kubespray_path }}/venv/bin/ansible-playbook after pip install"
-      when: not ansible_bin.stat.exists
-
-    - name: Create inventory directory
-      file:
-        path: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
-        state: directory
-        mode: '0755'
+    - name: Create Python virtual environment and install requirements
+      shell: |
+        python3 -m venv {{ kubespray_path }}/venv
+        {{ kubespray_path }}/venv/bin/pip install --upgrade pip
+        {{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt
+        {{ kubespray_path }}/venv/bin/pip install ansible
       check_mode: no
 
     - name: Generate single-node inventory
@@ -119,34 +76,14 @@
                 hosts: {}
       check_mode: no
 
-    - name: Find cluster playbook
-      shell: "find {{ kubespray_path }} -maxdepth 2 -name 'cluster.yml' | head -1"
-      register: cluster_playbook
-      check_mode: no
-
-    - name: Debug cluster playbook path
-      debug:
-        msg: "cluster.yml found at: {{ cluster_playbook.stdout }}"
-
-    - name: Deploy Kubernetes (single node) [CHECK MODE - would run this command]
-      debug:
-        msg: >
-          Would run: {{ kubespray_path }}/venv/bin/ansible-playbook
-          -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
-          --become
-          --private-key {{ ssh_private_key }}
-          {{ cluster_playbook.stdout }}
-      when: cluster_playbook.stdout != "" and ansible_check_mode
-
     - name: Deploy Kubernetes (single node)
       shell: >
         {{ kubespray_path }}/venv/bin/ansible-playbook
         -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
         --become
         --private-key {{ ssh_private_key }}
-        {{ cluster_playbook.stdout }}
+        {{ kubespray_path }}/cluster.yml
       args:
         chdir: "{{ kubespray_path }}"
       check_mode: no
-      when: cluster_playbook.stdout != "" and not ansible_check_mode
-
+      when: not ansible_check_mode
