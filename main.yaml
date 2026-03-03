@@ -56,10 +56,26 @@
       args:
         creates: "{{ kubespray_path }}/venv/bin/python3"
 
+    - name: Upgrade pip in virtual environment
+      shell: "{{ kubespray_path }}/venv/bin/pip install --upgrade pip"
+
     - name: Install Python requirements
       shell: "{{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt"
+
+    - name: Ensure ansible is installed in virtual environment
+      shell: "{{ kubespray_path }}/venv/bin/pip install ansible"
       args:
-        creates: "{{ kubespray_path }}/venv/lib"
+        creates: "{{ kubespray_path }}/venv/bin/ansible-playbook"
+
+    - name: Verify ansible-playbook binary exists
+      stat:
+        path: "{{ kubespray_path }}/venv/bin/ansible-playbook"
+      register: ansible_bin
+
+    - name: Fail if ansible-playbook not found in venv
+      fail:
+        msg: "ansible-playbook not found at {{ kubespray_path }}/venv/bin/ansible-playbook after pip install"
+      when: not ansible_bin.stat.exists
 
     - name: Create inventory directory
       file:
