@@ -5,7 +5,7 @@
 
   vars:
     kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
-    kubespray_version: release-2.30.0
+    kubespray_version: release-2.30
     kubespray_path: /plural/kubespray
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
@@ -31,6 +31,7 @@
         repo: "{{ kubespray_repo }}"
         dest: "{{ kubespray_path }}"
         version: "{{ kubespray_version }}"
+        refspec: "+refs/heads/{{ kubespray_version }}:refs/remotes/origin/{{ kubespray_version }}"
         force: yes
 
     - name: Stat kubespray directory after clone
