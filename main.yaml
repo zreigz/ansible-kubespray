@@ -9,6 +9,7 @@
     kubespray_path: /plural/kubespray
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
+    ssh_private_key: "{{ ansible_ssh_private_key_file | default('/tmp/ssh-privatekey') }}"
 
   tasks:
     - name: Install dependencies (Debian/Ubuntu control node)
@@ -97,6 +98,9 @@
                 ansible_host: {{ node_ip }}
                 ip: {{ node_ip }}
                 access_ip: {{ node_ip }}
+                ansible_user: ubuntu
+                ansible_become: true
+                ansible_ssh_private_key_file: {{ ssh_private_key }}
             children:
               kube_control_plane:
                 hosts:
@@ -129,7 +133,8 @@
         msg: >
           Would run: {{ kubespray_path }}/venv/bin/ansible-playbook
           -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
-          --become --become-user=root
+          --become
+          --private-key {{ ssh_private_key }}
           {{ cluster_playbook.stdout }}
       when: cluster_playbook.stdout != "" and ansible_check_mode
 
@@ -137,7 +142,8 @@
       shell: >
         {{ kubespray_path }}/venv/bin/ansible-playbook
         -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
-        --become --become-user=root
+        --become
+        --private-key {{ ssh_private_key }}
         {{ cluster_playbook.stdout }}
       args:
         chdir: "{{ kubespray_path }}"
