@@ -139,6 +139,8 @@
         -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
         --become --become-user=root
         {{ cluster_playbook.stdout }}
+      args:
+        chdir: "{{ kubespray_path }}"
       check_mode: no
       when: cluster_playbook.stdout != "" and not ansible_check_mode
 
