@@ -11,12 +11,7 @@
 
   tasks:
     - name: Clone Kubespray
-      git:
-        repo: "{{ kubespray_repo }}"
-        dest: "{{ kubespray_path }}"
-        version: "{{ kubespray_version }}"
-        depth: 1
-        force: yes
+      shell: "git clone --depth=1 --branch {{ kubespray_version }} {{ kubespray_repo }} {{ kubespray_path }}"
       check_mode: no
 
     - name: Install Python requirements
