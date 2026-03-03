@@ -8,34 +8,27 @@
   vars:
     kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
     kubespray_version: release-2.30.0
-    kubespray_path: /plural/kubespray
+    kubespray_path: "{{ ansible_env.HOME }}/kubespray"
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
 
   tasks:
-
-    - name: Install dependencies (Alpine)
-      apk:
-        name:
-          - git
-          - python3
-        state: present
-        update_cache: yes
-      when: ansible_os_family == "Alpine"
-
-    - name: Install dependencies (Ubuntu/Debian)
+    - name: Install dependencies (Debian/Ubuntu control node)
       apt:
         name:
           - git
+          - python3
           - python3-pip
           - python3-venv
+          - sshpass
+          - rsync
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
 
     - name: Ensure kubespray parent directory exists
       file:
-        path: "{{ kubespray_path | dirname }}"
+        path: "{{ kubespray_path }}"
         state: directory
         mode: '0755'
 
