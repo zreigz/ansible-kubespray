@@ -45,6 +45,13 @@
         {{ kubespray_path }}/venv/bin/pip install ansible
       check_mode: no
 
+    - name: Create inventory directory
+      file:
+        path: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
+        state: directory
+        mode: '0755'
+      check_mode: no
+
     - name: Generate single-node inventory
       copy:
         dest: "{{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml"
