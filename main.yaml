@@ -4,7 +4,8 @@
   gather_facts: yes
 
   vars:
-    kubespray_path: kubespray
+    kubespray_path: "{{ playbook_dir }}/kubespray"
+    inventory_path: "{{ playbook_dir }}/inventory"
     inventory_name: single
     node_ip: "{{ hostvars[groups['k8s'][0]]['ansible_host'] }}"
     ssh_private_key: "{{ ansible_ssh_private_key_file | default('/tmp/ssh-privatekey') }}"
@@ -22,14 +23,14 @@
 
     - name: Create inventory directory
       file:
-        path: "{{ kubespray_path }}/inventory/{{ inventory_name }}"
+        path: "{{ inventory_path }}/{{ inventory_name }}"
         state: directory
         mode: '0755'
       check_mode: no
 
     - name: Generate single-node inventory
       copy:
-        dest: "{{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml"
+        dest: "{{ inventory_path }}/{{ inventory_name }}/hosts.yaml"
         content: |
           all:
             hosts:
@@ -61,7 +62,7 @@
     - name: Deploy Kubernetes (single node)
       shell: >
         {{ kubespray_path }}/venv/bin/ansible-playbook
-        -i {{ kubespray_path }}/inventory/{{ inventory_name }}/hosts.yaml
+        -i {{ inventory_path }}/{{ inventory_name }}/hosts.yaml
         --become
         --private-key {{ ssh_private_key }}
         -e ignore_assert_errors=yes
@@ -72,3 +73,4 @@
         chdir: "{{ kubespray_path }}"
       check_mode: no
       when: not ansible_check_mode
+
