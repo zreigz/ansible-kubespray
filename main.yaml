@@ -35,17 +35,6 @@
         remote_src: yes
       check_mode: no
 
-    - name: Run Kubespray cluster.yml
-      shell: >
-        ansible-playbook
-        -i {{ inventory_path }}/inventory.yaml
-        --become
-        -e ignore_assert_errors=yes
-        -e minimal_master_memory_mb=0
-        -e minimal_node_memory_mb=0
-        {{ kubespray_path }}/cluster.yml
-      args:
-        chdir: "{{ kubespray_path }}"
-      check_mode: no
-      when: not ansible_check_mode
+- name: Install Kubernetes
+  ansible.builtin.import_playbook: kubespray/playbooks/cluster.yml
 
