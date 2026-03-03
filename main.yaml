@@ -53,8 +53,6 @@
 
     - name: Create Python virtual environment
       shell: "python3 -m venv {{ kubespray_path }}/venv"
-      args:
-        creates: "{{ kubespray_path }}/venv/bin/python3"
 
     - name: Upgrade pip in virtual environment
       shell: "{{ kubespray_path }}/venv/bin/pip install --upgrade pip"
@@ -64,8 +62,6 @@
 
     - name: Ensure ansible is installed in virtual environment
       shell: "{{ kubespray_path }}/venv/bin/pip install ansible"
-      args:
-        creates: "{{ kubespray_path }}/venv/bin/ansible-playbook"
 
     - name: Verify ansible-playbook binary exists
       stat:
