@@ -24,11 +24,8 @@
         depth: 1
       check_mode: no
 
-    - name: Create Python virtual environment and install requirements
-      shell: |
-        python3 -m venv {{ kubespray_path }}/venv
-        {{ kubespray_path }}/venv/bin/pip install --upgrade pip
-        {{ kubespray_path }}/venv/bin/pip install -r {{ kubespray_path }}/requirements.txt
+    - name: Install Python requirements
+      shell: "pip install -r {{ kubespray_path }}/requirements.txt"
       check_mode: no
 
     - name: Create inventory directory
@@ -42,12 +39,5 @@
       copy:
         src: "{{ kubespray_path }}/inventory/sample/group_vars"
         dest: "{{ inventory_path }}/"
-        remote_src: yes
-      check_mode: no
-
-    - name: Copy inventory file
-      copy:
-        src: "{{ playbook_dir }}/inventory.yaml"
-        dest: "{{ inventory_path }}/inventory.yaml"
         remote_src: yes
       check_mode: no
