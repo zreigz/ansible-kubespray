@@ -26,13 +26,13 @@
         update_cache: yes
       when: ansible_os_family == "Debian"
 
+    - name: Remove existing kubespray directory if present
+      file:
+        path: "{{ kubespray_path }}"
+        state: absent
+
     - name: Clone Kubespray
-      git:
-        repo: "{{ kubespray_repo }}"
-        dest: "{{ kubespray_path }}"
-        version: "{{ kubespray_version }}"
-        refspec: "+refs/heads/{{ kubespray_version }}:refs/remotes/origin/{{ kubespray_version }}"
-        force: yes
+      shell: "git clone --depth=1 --branch {{ kubespray_version }} {{ kubespray_repo }} {{ kubespray_path }}"
 
     - name: Stat kubespray directory after clone
       stat:
