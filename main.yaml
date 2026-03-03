@@ -10,22 +10,18 @@
     inventory_path: "{{ kubespray_path }}/inventory/single"
 
   tasks:
-    - name: Remove existing kubespray directory
-      file:
-        path: "{{ kubespray_path }}"
-        state: absent
-      check_mode: no
-
     - name: Clone Kubespray
       git:
         repo: "{{ kubespray_repo }}"
         dest: "{{ kubespray_path }}"
         version: "{{ kubespray_version }}"
         depth: 1
+        force: yes
       check_mode: no
 
     - name: Install Python requirements
-      shell: "pip install -r {{ kubespray_path }}/requirements.txt"
+      pip:
+        requirements: "{{ kubespray_path }}/requirements.txt"
       check_mode: no
 
     - name: Create inventory directory
@@ -39,5 +35,12 @@
       copy:
         src: "{{ kubespray_path }}/inventory/sample/group_vars"
         dest: "{{ inventory_path }}/"
+        remote_src: yes
+      check_mode: no
+
+    - name: Copy inventory file
+      copy:
+        src: "{{ playbook_dir }}/inventory.yaml"
+        dest: "{{ inventory_path }}/inventory.yaml"
         remote_src: yes
       check_mode: no
