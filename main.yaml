@@ -36,4 +36,4 @@
       check_mode: no
 
 - name: Install Kubernetes
-  ansible.builtin.import_playbook: kubespray/cluster.yml
+  ansible.builtin.import_playbook: kubespray/playbooks/cluster.yml
