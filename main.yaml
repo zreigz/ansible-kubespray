@@ -26,12 +26,6 @@
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Ensure kubespray parent directory exists
-      file:
-        path: "{{ kubespray_path }}"
-        state: directory
-        mode: '0755'
-
     - name: Clone Kubespray
       git:
         repo: "{{ kubespray_repo }}"
