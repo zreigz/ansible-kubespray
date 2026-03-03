@@ -5,14 +5,9 @@
 
   vars:
     kubespray_path: "{{ playbook_dir }}/kubespray"
-    kubespray_repo: https://github.com/kubernetes-sigs/kubespray.git
-    kubespray_version: release-2.30
     inventory_path: "{{ kubespray_path }}/inventory/single"
 
   tasks:
-    - name: Clone Kubespray
-      shell: "git clone --depth=1 --branch {{ kubespray_version }} {{ kubespray_repo }} {{ kubespray_path }}"
-      check_mode: no
 
     - name: Install Python requirements
       pip:
