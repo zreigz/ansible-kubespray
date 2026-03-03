@@ -40,7 +40,7 @@
 
     - name: Debug kubespray stat result
       debug:
-        msg: "exists={{ kubespray_stat.stat.exists }} isdir={{ kubespray_stat.stat.isdir }} owner={{ kubespray_stat.stat.pw_name }}"
+        msg: "exists={{ kubespray_stat.stat.exists }} isdir={{ kubespray_stat.stat.get('isdir', 'N/A') }} owner={{ kubespray_stat.stat.get('pw_name', 'N/A') }}"
 
     - name: List kubespray directory contents
       shell: "ls -la {{ kubespray_path }}"
